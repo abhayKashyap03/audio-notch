@@ -24,6 +24,11 @@ final class TransportProbe: @unchecked Sendable {
         return states[transport]
     }
 
+    /// Records a state we were told about, rather than one we asked for.
+    func set(_ transport: Transport, playing: Bool) {
+        lock.lock(); states[transport] = playing; lastPoll = Date(); lock.unlock()
+    }
+
     /// Forces the next poll to run, used right after we change playback ourselves.
     func invalidate() {
         lock.lock(); lastPoll = .distantPast; lock.unlock()

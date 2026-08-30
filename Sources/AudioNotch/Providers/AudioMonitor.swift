@@ -205,6 +205,7 @@ final class AudioMonitor: @unchecked Sendable {
     /// CoreAudio notifies us on change, which is what keeps the pill in sync with a
     /// track starting rather than up to a poll interval behind it.
     func start() {
+        observePlaybackBroadcasts()
         observe(CA.system, kAudioHardwarePropertyProcessObjectList) { [weak self] in
             self?.refreshProcessListeners()
             self?.onChange?()
@@ -216,6 +217,25 @@ final class AudioMonitor: @unchecked Sendable {
         }
         knownDeviceUIDs = Set(outputDevices().map(\.uid))
         refreshProcessListeners()
+    }
+
+    /// Media apps broadcast their own state changes, which is how the panel keeps up
+    /// with the keyboard's play/pause key. Polling could never be both fast and cheap.
+    private func observePlaybackBroadcasts() {
+        let center = DistributedNotificationCenter.default()
+        let feeds: [(name: String, transport: Transport)] = [
+            ("com.spotify.client.PlaybackStateChanged", .spotify),
+            ("com.apple.iTunes.playerInfo", .music),
+        ]
+        for feed in feeds {
+            center.addObserver(forName: Notification.Name(feed.name), object: nil, queue: .main) { [weak self] note in
+                guard let self else { return }
+                let state = (note.userInfo?["Player State"] as? String)?.lowercased()
+                if let state { self.transportProbe.set(feed.transport, playing: state == "playing") }
+                debugLog("broadcast: \(feed.transport.appName) \(state ?? "?")")
+                self.onChange?()
+            }
+        }
     }
 
     private func refreshProcessListeners() {
