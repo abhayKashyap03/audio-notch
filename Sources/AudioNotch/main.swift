@@ -14,12 +14,41 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 }
 
 // `AudioNotch --dump` prints what CoreAudio reports, then exits.
+// `AudioNotch --test-pause` exercises the transport path with the app's own
+// identity, which is what Automation permission is granted against.
+if CommandLine.arguments.contains("--test-pause") {
+    let ok = AudioControls.togglePlayback(.spotify)
+    print("togglePlayback -> \(ok), automationDenied=\(AudioControls.automationDenied)")
+    exit(0)
+}
+
+// `AudioNotch --levels` prints live per-app levels for a few seconds.
+if CommandLine.arguments.contains("--levels") {
+    let monitor = AudioMonitor()
+    for tick in 0..<24 {
+        let snapshot = monitor.snapshot()
+        if tick % 4 == 0 {
+            let line = snapshot.sources.filter(\.isPlaying)
+                .map { "\($0.name)=\(String(format: "%.2f", $0.level))" }
+                .joined(separator: "  ")
+            print(line.isEmpty ? "(nothing playing)" : line)
+        }
+        usleep(250_000)
+    }
+    print("metering unavailable: \(monitor.meteringUnavailable)  \(monitor.meterDiagnostics)")
+    exit(0)
+}
+
 if CommandLine.arguments.contains("--dump") {
     let snapshot = AudioMonitor().snapshot()
     print("volume: \(Int((snapshot.volume * 100).rounded()))%  muted: \(snapshot.muted)")
     print("output: \(snapshot.currentDevice?.name ?? "none")")
     for device in snapshot.devices {
         print("  device \(device.isDefault ? "*" : " ") \(device.name)")
+    }
+    print("camera active: \(snapshot.cameraActive)   metering: \(snapshot.meteringUnavailable ? "unavailable" : "ok")")
+    for event in snapshot.recent.prefix(6) {
+        print("  event \(event.app) \(event.kind.verb) \(event.ago()) ago")
     }
     for source in snapshot.sources {
         let state = source.isRecording ? "recording" : (source.isPlaying ? "playing" : "idle")

@@ -195,7 +195,10 @@ final class NotchController: NSObject, NSMenuDelegate {
         AudioRootView(
             store: store,
             state: state,
-            onHitTargets: { [weak self] targets in self?.hosting?.hitTargets = targets },
+            onHitTargets: { [weak self] targets in
+                self?.hosting?.hitTargets = targets
+                self?.debugLog("targets=" + targets.map { "\($0.id)@\(Int($0.rect.minY))-\(Int($0.rect.maxY))" }.sorted().joined(separator: " "))
+            },
             onPanelHeight: { [weak self] height in
                 self?.debugLog("panel measured \(height)")
                 self?.positionPanel()
@@ -482,6 +485,10 @@ final class NotchController: NSObject, NSMenuDelegate {
         rebuildLayout()
     }
 
+    @objc private func menuToggleFollow() {
+        Settings.shared.followNewDevices.toggle()
+    }
+
     @objc private func menuToggleLoginItem() {
         let service = SMAppService.mainApp
         do {
@@ -559,6 +566,10 @@ final class NotchController: NSObject, NSMenuDelegate {
         position.addItem(item("Reset to default spot", #selector(menuResetPosition)))
         menu.addItem(submenu(s.edge == .top ? "Position" : "Position (drag to move)", position))
 
+
+        let follow = item("Follow newly connected devices", #selector(menuToggleFollow))
+        follow.state = s.followNewDevices ? .on : .off
+        menu.addItem(follow)
 
         let login = item("Open at login", #selector(menuToggleLoginItem))
         login.state = SMAppService.mainApp.status == .enabled ? .on : .off

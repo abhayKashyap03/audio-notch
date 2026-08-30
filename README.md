@@ -40,6 +40,26 @@ they have actually made a sound — the raw process list is mostly idle daemons 
 and linger for a few seconds after going quiet so rows do not flicker between
 tracks.
 
+## Beyond what Control Center shows
+
+macOS already lists media apps in Now Playing. That list comes from MediaRemote, so
+it only ever contains apps that publish now-playing info — a game, a Zoom call, or a
+random tab making noise never appear. This reads the audio hardware instead, so it
+sees all of them, and adds the things that list cannot answer:
+
+- **Live level meters.** One CoreAudio process tap per playing app, gathered into a
+  private aggregate device, reduced to an RMS. Nothing is recorded or written; only a
+  number per app reaches the UI. macOS hands out silent buffers until you allow audio
+  recording, and the panel says so rather than drawing flat bars.
+- **A rolling history.** Every start and stop is logged, so "what was that sound?" is
+  answerable after the app has gone quiet again.
+- **A watchdog.** The green dot says something is recording and refuses to name it.
+  The panel names the app holding the mic, and flags the camera via CoreMediaIO
+  (which reports that a camera is live but not which app owns it, so the mic user is
+  used for attribution).
+- **Follow new devices.** Connect AirPods and output switches to them. Toggle it off
+  in the menu if you would rather choose every time.
+
 ## Sharing the notch
 
 Several of these widgets can run at once. Each publishes the strip of screen it

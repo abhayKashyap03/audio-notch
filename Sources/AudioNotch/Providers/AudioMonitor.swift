@@ -14,9 +14,20 @@ final class AudioMonitor: @unchecked Sendable {
 
     private var listeners: [(AudioObjectID, AudioObjectPropertyAddress, AudioObjectPropertyListenerBlock)] = []
     private var quietSince: [pid_t: Date] = [:]
+    private var wasPlaying: Set<pid_t> = []
+    private var history: [AudioEvent] = []
+    private var knownDeviceUIDs: Set<String> = []
     /// Only apps we have actually heard get to linger; the rest never appear at all.
     private var everPlayed: Set<pid_t> = []
     private let queue = DispatchQueue(label: "com.abhaykashyap.audionotch.coreaudio")
+    private let tapEngine = AudioTapEngine()
+
+    /// Live 0...1 levels per app, empty when tapping is unavailable.
+    func levels() -> [pid_t: Float] { tapEngine.levels() }
+    var meteringUnavailable: Bool { tapEngine.unavailable || tapEngine.permissionLikelyMissing }
+    var meterDiagnostics: String {
+        "callbacks=\(tapEngine.callbackCount) bytes=\(tapEngine.bytesSeen) peak=\(tapEngine.peakSeen)"
+    }
     var onChange: (() -> Void)?
 
     // MARK: - Snapshot
@@ -25,6 +36,9 @@ final class AudioMonitor: @unchecked Sendable {
         var snap = AudioSnapshot()
         snap.sources = sources(now: now)
         snap.devices = outputDevices()
+        snap.recent = history
+        snap.cameraActive = CameraWatch.isActive()
+        snap.meteringUnavailable = meteringUnavailable
         let device = CA.value(CA.system, kAudioHardwarePropertyDefaultOutputDevice, default: AudioObjectID(0))
         snap.volume = AudioControls.volume(of: device) ?? 0
         snap.muted = AudioControls.isMuted(device)
@@ -34,6 +48,8 @@ final class AudioMonitor: @unchecked Sendable {
     private func sources(now: Date) -> [AudioSource] {
         var byOwner: [String: AudioSource] = [:]
         var loose: [AudioSource] = []
+        // (owner pid, audio process object) pairs to meter.
+        var metered: [(pid: pid_t, object: AudioObjectID)] = []
 
         for process in CA.objects(CA.system, kAudioHardwarePropertyProcessObjectList) {
             let pid: pid_t = CA.value(process, kAudioProcessPropertyPID, default: -1)
@@ -58,6 +74,18 @@ final class AudioMonitor: @unchecked Sendable {
             }
 
             guard let owner = resolveOwner(pid: pid, bundle: bundle) else { continue }
+            if playing { metered.append((owner.pid, process)) }
+
+            // Log the moment something starts or stops, which is the only record of
+            // "what made that noise" once the app has gone quiet again.
+            let wasOn = wasPlaying.contains(pid)
+            if playing && !wasOn {
+                wasPlaying.insert(pid)
+                record(AudioEvent(app: owner.name, kind: recording ? .startedRecording : .started, at: now))
+            } else if !playing && wasOn {
+                wasPlaying.remove(pid)
+                record(AudioEvent(app: owner.name, kind: .stopped, at: now))
+            }
             let source = AudioSource(id: owner.pid, name: owner.name, bundleID: bundle,
                                      ownerBundleID: owner.bundle, isPlaying: playing,
                                      isRecording: recording, wentQuietAt: quiet)
@@ -77,7 +105,13 @@ final class AudioMonitor: @unchecked Sendable {
             }
         }
 
-        let all = Array(byOwner.values) + loose
+        tapEngine.track(processes: metered)
+        let levels = tapEngine.levels()
+        let all = (Array(byOwner.values) + loose).map { source -> AudioSource in
+            var copy = source
+            copy.level = levels[source.id] ?? 0
+            return copy
+        }
         return all.sorted { lhs, rhs in
             if lhs.isPlaying != rhs.isPlaying { return lhs.isPlaying }
             if lhs.isRecording != rhs.isRecording { return lhs.isRecording }
@@ -114,6 +148,25 @@ final class AudioMonitor: @unchecked Sendable {
         return nil    // a system daemon: not something the user can act on
     }
 
+    /// When a device appears that was not there a moment ago, that is almost always
+    /// the one you just connected.
+    private func adoptNewDevice() {
+        let devices = outputDevices()
+        let uids = Set(devices.map(\.uid))
+        defer { knownDeviceUIDs = uids }
+        guard Settings.shared.followNewDevices, !knownDeviceUIDs.isEmpty else { return }
+        let appeared = uids.subtracting(knownDeviceUIDs)
+        guard let new = devices.first(where: { appeared.contains($0.uid) }) else { return }
+        debugLog("new output device \(new.name); switching")
+        AudioControls.selectOutput(new.id)
+        record(AudioEvent(app: new.name, kind: .becameOutput, at: Date()))
+    }
+
+    private func record(_ event: AudioEvent) {
+        history.insert(event, at: 0)
+        if history.count > 40 { history.removeLast(history.count - 40) }
+    }
+
     private func outputDevices() -> [OutputDevice] {
         let current = CA.value(CA.system, kAudioHardwarePropertyDefaultOutputDevice, default: AudioObjectID(0))
         return CA.objects(CA.system, kAudioHardwarePropertyDevices).compactMap { device in
@@ -133,9 +186,12 @@ final class AudioMonitor: @unchecked Sendable {
             self?.refreshProcessListeners()
             self?.onChange?()
         }
-        for selector in [kAudioHardwarePropertyDefaultOutputDevice, kAudioHardwarePropertyDevices] {
-            observe(CA.system, selector) { [weak self] in self?.onChange?() }
+        observe(CA.system, kAudioHardwarePropertyDefaultOutputDevice) { [weak self] in self?.onChange?() }
+        observe(CA.system, kAudioHardwarePropertyDevices) { [weak self] in
+            self?.adoptNewDevice()
+            self?.onChange?()
         }
+        knownDeviceUIDs = Set(outputDevices().map(\.uid))
         refreshProcessListeners()
     }
 

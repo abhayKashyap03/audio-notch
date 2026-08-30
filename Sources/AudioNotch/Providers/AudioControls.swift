@@ -48,14 +48,39 @@ enum AudioControls {
     // MARK: - Per app
 
     /// Play/pause for the handful of apps that expose it to scripting.
-    static func togglePlayback(_ transport: Transport) {
-        run(script: "tell application \"\(transport.appName)\" to playpause")
+    ///
+    /// Returns false when macOS refuses the Apple event — the app needs Automation
+    /// permission for that target, which the caller surfaces rather than swallowing.
+    @discardableResult
+    static func togglePlayback(_ transport: Transport) -> Bool {
+        // `playpause` returns nothing, so a nil result means "no value", not
+        // "failed". Only an actual error justifies the fallback — otherwise the key
+        // press lands as a second toggle and playback resumes immediately.
+        if execute("tell application \"\(transport.appName)\" to playpause").ok { return true }
+        // Fall back to the media key: no permission needed, but it only reaches
+        // whichever app currently owns Now Playing.
+        return pressPlayPauseKey()
+    }
+
+    /// Synthesises the keyboard's play/pause key.
+    @discardableResult
+    static func pressPlayPauseKey() -> Bool {
+        let playKey: Int = 16   // NX_KEYTYPE_PLAY
+        for isDown in [true, false] {
+            let data1 = (playKey << 16) | ((isDown ? 0x0A : 0x0B) << 8)
+            guard let event = NSEvent.otherEvent(with: .systemDefined, location: .zero,
+                                                 modifierFlags: [], timestamp: 0, windowNumber: 0,
+                                                 context: nil, subtype: 8, data1: data1, data2: -1),
+                  let cg = event.cgEvent else { return false }
+            cg.post(tap: .cghidEventTap)
+        }
+        return true
     }
 
     static func isPlaying(_ transport: Transport) -> Bool? {
-        guard let out = run(script: "tell application \"\(transport.appName)\" to player state as string")
-        else { return nil }
-        return out.contains("playing")
+        let result = execute("tell application \"\(transport.appName)\" to player state as string")
+        guard result.ok, let value = result.value else { return nil }
+        return value.contains("playing")
     }
 
     /// Everything else gets brought to the front so you can deal with it yourself.
@@ -63,12 +88,24 @@ enum AudioControls {
         NSRunningApplication(processIdentifier: pid)?.activate(options: [.activateAllWindows])
     }
 
+    /// True once macOS has refused an Apple event, so the UI can explain itself once.
+    private(set) static var automationDenied = false
+
+    /// Success is reported separately from the returned value: commands like
+    /// `playpause` succeed while returning nothing at all.
     @discardableResult
-    private static func run(script: String) -> String? {
+    private static func execute(_ source: String) -> (ok: Bool, value: String?) {
         var error: NSDictionary?
-        let value = NSAppleScript(source: script)?.executeAndReturnError(&error)
-        if let error { debugLog("applescript failed: \(error)") ; return nil }
-        return value?.stringValue
+        guard let script = NSAppleScript(source: source) else { return (false, nil) }
+        let descriptor = script.executeAndReturnError(&error)
+        if let error {
+            // -1743 is "not authorised": the user must allow this app under
+            // Privacy & Security > Automation.
+            if (error[NSAppleScript.errorNumber] as? Int) == -1743 { automationDenied = true }
+            debugLog("applescript failed: \(error)")
+            return (false, nil)
+        }
+        return (true, descriptor.stringValue)
     }
 }
 

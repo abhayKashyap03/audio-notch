@@ -44,6 +44,7 @@ final class Settings {
         static let edge = "edge"
         static let sideOffset = "sideOffset"
         static let topOffset = "topOffset"
+        static let followNewDevices = "followNewDevices"
     }
 
     private init() {
@@ -54,6 +55,7 @@ final class Settings {
             K.edge: NotchEdge.top.rawValue,
             K.sideOffset: 0.0,
             K.topOffset: 0.0,
+            K.followNewDevices: true,
         ])
     }
 
@@ -77,6 +79,13 @@ final class Settings {
     func resetOffsets() {
         topOffset = 0
         sideOffset = 0
+    }
+
+    /// Switch output automatically when a device appears (AirPods connecting, a
+    /// monitor waking). The common case is that you want the thing you just plugged in.
+    var followNewDevices: Bool {
+        get { d.bool(forKey: K.followNewDevices) }
+        set { d.set(newValue, forKey: K.followNewDevices) }
     }
 
     var anchor: NotchAnchor {

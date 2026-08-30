@@ -20,6 +20,10 @@
     <string>14.0</string>
     <key>LSUIElement</key>
     <true/>
+    <key>NSAppleEventsUsageDescription</key>
+    <string>Audio Notch uses Apple Events to pause and resume media apps such as Spotify and Music.</string>
+    <key>NSAudioCaptureUsageDescription</key>
+    <string>Audio Notch reads short samples of app audio to draw live level meters. Nothing is recorded or stored.</string>
     <key>NSHighResolutionCapable</key>
     <true/>
     <key>NSSupportsAutomaticTermination</key>

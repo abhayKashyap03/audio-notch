@@ -81,28 +81,44 @@ struct AudioRootView: View {
 struct LevelBars: View {
     var tint: Color
     var animating: Bool
+    /// Real 0...1 level when the app can read one; zero falls back to the animation.
+    var level: Float = 0
     var height: CGFloat = 12
 
     @State private var phase = false
     private let scales: [CGFloat] = [0.5, 1.0, 0.68, 0.85]
+
+    private var metered: Bool { level > 0.001 }
 
     var body: some View {
         HStack(alignment: .center, spacing: 2) {
             ForEach(Array(scales.enumerated()), id: \.offset) { index, scale in
                 Capsule()
                     .fill(tint)
-                    .frame(width: 2, height: animating ? (phase ? height * scale : max(height * 0.28 * scale, 3)) : 3)
+                    .frame(width: 2, height: barHeight(index: index, scale: scale))
                     .animation(
-                        animating
-                            ? .easeInOut(duration: 0.38 + Double(index) * 0.07).repeatForever(autoreverses: true)
-                            : .easeOut(duration: 0.2),
-                        value: phase
+                        metered
+                            ? .linear(duration: 0.07)
+                            : (animating
+                                ? .easeInOut(duration: 0.38 + Double(index) * 0.07).repeatForever(autoreverses: true)
+                                : .easeOut(duration: 0.2)),
+                        value: metered ? CGFloat(level) : (phase ? 1 : 0)
                     )
             }
         }
         .frame(height: height)
         .onAppear { phase = animating }
         .onChange(of: animating) { _, now in phase = now }
+    }
+
+    private func barHeight(index: Int, scale: CGFloat) -> CGFloat {
+        if metered {
+            // Bars lag each other slightly so the meter reads as movement, not a block.
+            let lag: CGFloat = [1.0, 0.88, 0.74, 0.62][index % 4]
+            return max(3, height * min(CGFloat(level) * lag * scale * 1.6, 1))
+        }
+        guard animating else { return 3 }
+        return phase ? height * scale : max(height * 0.28 * scale, 3)
     }
 }
 
@@ -178,7 +194,8 @@ private struct PillContent: View {
                         .foregroundStyle(.white.opacity(0.45))
                         .lineLimit(1)
                 }
-                LevelBars(tint: .green.opacity(0.85), animating: lead.isPlaying, height: 10)
+                LevelBars(tint: .green.opacity(0.85), animating: lead.isPlaying,
+                          level: lead.level, height: 10)
             } else {
                 Image(systemName: "speaker.slash.fill")
                     .font(.system(size: 10))
@@ -229,7 +246,8 @@ private struct PillContent: View {
         VStack(spacing: 7) {
             if let lead {
                 AppIcon(source: lead, size: 14)
-                LevelBars(tint: .green.opacity(0.85), animating: lead.isPlaying, height: 9)
+                LevelBars(tint: .green.opacity(0.85), animating: lead.isPlaying,
+                          level: lead.level, height: 9)
             } else {
                 Image(systemName: "speaker.slash.fill")
                     .font(.system(size: 10))
@@ -310,6 +328,10 @@ private struct Panel: View {
 
             volumeRow
 
+            if snapshot.cameraActive || !snapshot.recording.isEmpty {
+                watchdogRow
+            }
+
             if snapshot.sources.isEmpty {
                 Text("Nothing is playing")
                     .font(.system(size: 10.5, weight: .medium, design: .rounded))
@@ -320,6 +342,33 @@ private struct Panel: View {
                 ForEach(snapshot.sources) { source in
                     sourceRow(source)
                 }
+            }
+
+            if !snapshot.recent.isEmpty {
+                section("RECENT")
+                ForEach(snapshot.recent.prefix(3)) { event in
+                    HStack(spacing: 6) {
+                        Circle().fill(Color.white.opacity(0.25)).frame(width: 4, height: 4)
+                        Text(event.app)
+                            .font(.system(size: 10, weight: .medium, design: .rounded))
+                            .foregroundStyle(.white.opacity(0.6))
+                            .lineLimit(1)
+                        Text(event.kind.verb)
+                            .font(.system(size: 9.5, weight: .medium, design: .rounded))
+                            .foregroundStyle(.white.opacity(0.35))
+                        Spacer(minLength: 4)
+                        Text(event.ago())
+                            .font(.system(size: 9, weight: .medium, design: .monospaced))
+                            .foregroundStyle(.white.opacity(0.3))
+                    }
+                    .frame(height: 16)
+                }
+            }
+
+            if snapshot.meteringUnavailable && snapshot.anyPlaying {
+                Text("levels need audio-recording permission")
+                    .font(.system(size: 9, weight: .medium, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.28))
             }
 
             if snapshot.devices.count > 1 {
@@ -333,6 +382,34 @@ private struct Panel: View {
         .padding(.horizontal, Style.panelInset)
         .padding(.top, layout.placement.edge.isIsland ? 8 : 12)
         .padding(.bottom, 12)
+    }
+
+    /// Who is watching or listening to you right now — the question the green dot
+    /// refuses to answer.
+    private var watchdogRow: some View {
+        HStack(spacing: 7) {
+            Image(systemName: snapshot.cameraActive ? "video.fill" : "mic.fill")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(.red.opacity(0.85))
+            Text(watchdogText)
+                .font(.system(size: 10, weight: .semibold, design: .rounded))
+                .foregroundStyle(.white.opacity(0.8))
+                .lineLimit(1)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 5)
+        .background(Color.red.opacity(0.13), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+    }
+
+    private var watchdogText: String {
+        let who = snapshot.recording.first?.name
+        switch (snapshot.cameraActive, who) {
+        case (true, let name?): return "\(name) — camera and mic"
+        case (true, nil): return "camera in use"
+        case (false, let name?): return "\(name) — using the mic"
+        default: return "in use"
+        }
     }
 
     private func section(_ title: String) -> some View {
@@ -384,7 +461,8 @@ private struct Panel: View {
             }
             Spacer(minLength: 4)
             LevelBars(tint: source.isRecording ? .red.opacity(0.8) : .green.opacity(0.85),
-                      animating: source.isPlaying || source.isRecording, height: 11)
+                      animating: source.isPlaying || source.isRecording,
+                      level: source.level, height: 11)
             Text(source.transport == nil ? "focus" : "pause")
                 .font(.system(size: 9, weight: .semibold, design: .rounded))
                 .foregroundStyle(.white.opacity(0.45))
