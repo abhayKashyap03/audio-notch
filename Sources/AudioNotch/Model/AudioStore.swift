@@ -110,12 +110,23 @@ final class AudioStore: ObservableObject {
     }
 
     func act(on source: AudioSource) {
-        if let transport = source.transport {
-            AudioControls.togglePlayback(transport)
-            if AudioControls.automationDenied { explainAutomation() }
-        } else {
+        guard let transport = source.transport else {
             AudioControls.focus(pid: source.id)
+            reload()
+            return
         }
-        reload()
+
+        let willBePlaying = !source.reallyPlaying
+        AudioControls.togglePlayback(transport)
+        if AudioControls.automationDenied { explainAutomation() }
+
+        // Reflect the click immediately. Waiting for the next poll to confirm what we
+        // just asked for is the difference between a button and a suggestion.
+        if let index = snapshot.sources.firstIndex(where: { $0.id == source.id }) {
+            snapshot.sources[index].transportPlaying = willBePlaying
+        }
+        monitor.invalidateTransport()
+        // Then confirm, in case the app disagreed.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in self?.reload() }
     }
 }

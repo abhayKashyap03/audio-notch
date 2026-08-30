@@ -189,7 +189,7 @@ private struct PillContent: View {
                         .font(.system(size: 9.5, weight: .semibold, design: .rounded))
                         .foregroundStyle(.white.opacity(0.9))
                         .lineLimit(1)
-                    Text(snapshot.playing.count > 1 ? "+\(snapshot.playing.count - 1) more" : (lead.isPlaying ? "playing" : "idle"))
+                    Text(snapshot.playing.count > 1 ? "+\(snapshot.playing.count - 1) more" : (lead.reallyPlaying ? "playing" : "paused"))
                         .font(.system(size: 8.5, weight: .medium, design: .rounded))
                         .foregroundStyle(.white.opacity(0.45))
                         .lineLimit(1)
@@ -455,7 +455,7 @@ private struct Panel: View {
                     .font(.system(size: 11, weight: .semibold, design: .rounded))
                     .foregroundStyle(.white.opacity(0.9))
                     .lineLimit(1)
-                Text(source.isRecording ? "using the mic" : (source.isPlaying ? "playing" : "idle"))
+                Text(source.isRecording ? "using the mic" : (source.reallyPlaying ? "playing" : "paused"))
                     .font(.system(size: 9, weight: .medium, design: .rounded))
                     .foregroundStyle(source.isRecording ? .red.opacity(0.8) : .white.opacity(0.35))
             }

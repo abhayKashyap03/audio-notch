@@ -40,7 +40,10 @@ if CommandLine.arguments.contains("--levels") {
 }
 
 if CommandLine.arguments.contains("--dump") {
-    let snapshot = AudioMonitor().snapshot()
+    let monitor = AudioMonitor()
+    _ = monitor.snapshot()          // priming pass: the transport probe answers async
+    usleep(2_500_000)
+    let snapshot = monitor.snapshot()
     print("volume: \(Int((snapshot.volume * 100).rounded()))%  muted: \(snapshot.muted)")
     print("output: \(snapshot.currentDevice?.name ?? "none")")
     for device in snapshot.devices {
@@ -52,7 +55,8 @@ if CommandLine.arguments.contains("--dump") {
     }
     for source in snapshot.sources {
         let state = source.isRecording ? "recording" : (source.isPlaying ? "playing" : "idle")
-        print("  source \(source.name) [\(source.ownerBundleID ?? "?")] \(state) transport=\(source.transport?.appName ?? "none")")
+        let says = source.transportPlaying.map { $0 ? "says playing" : "says paused" } ?? "no answer"
+        print("  source \(source.name) [\(source.ownerBundleID ?? "?")] \(state) transport=\(source.transport?.appName ?? "none") \(says) chip=\(source.actionLabel)")
     }
     exit(0)
 }

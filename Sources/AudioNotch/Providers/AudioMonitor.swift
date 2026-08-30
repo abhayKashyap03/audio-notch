@@ -21,6 +21,10 @@ final class AudioMonitor: @unchecked Sendable {
     private var everPlayed: Set<pid_t> = []
     private let queue = DispatchQueue(label: "com.abhaykashyap.audionotch.coreaudio")
     private let tapEngine = AudioTapEngine()
+    private let transportProbe = TransportProbe()
+
+    /// Drops the cached playback answer so the next snapshot re-asks immediately.
+    func invalidateTransport() { transportProbe.invalidate() }
 
     /// Live 0...1 levels per app, empty when tapping is unavailable.
     func levels() -> [pid_t: Float] { tapEngine.levels() }
@@ -116,11 +120,17 @@ final class AudioMonitor: @unchecked Sendable {
                                           isPlaying: false, isRecording: false)
         }
 
+        // Ask scriptable apps what they think they are doing; the hardware's idea of
+        // "running" lingers after a pause.
+        let transports = byOwner.values.compactMap(\.transport)
+        transportProbe.poll(running: Array(Set(transports)))
+
         tapEngine.track(processes: metered)
         let levels = tapEngine.levels()
         let all = (Array(byOwner.values) + loose).map { source -> AudioSource in
             var copy = source
             copy.level = levels[source.id] ?? 0
+            if let transport = source.transport { copy.transportPlaying = transportProbe.isPlaying(transport) }
             return copy
         }
         return all.sorted { lhs, rhs in

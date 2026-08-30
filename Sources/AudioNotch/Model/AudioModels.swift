@@ -14,6 +14,8 @@ struct AudioSource: Identifiable, Equatable {
     var wentQuietAt: Date?
     /// Live output level, 0...1, when process tapping is available.
     var level: Float = 0
+    /// What a scriptable app says about itself, which beats the hardware's view.
+    var transportPlaying: Bool?
 
     var icon: NSImage? {
         guard let bundle = ownerBundleID ?? bundleID,
@@ -25,15 +27,20 @@ struct AudioSource: Identifiable, Equatable {
     /// Apps we can actually drive, rather than only focus.
     var transport: Transport? { Transport.forBundle(ownerBundleID ?? bundleID ?? "") }
 
+    /// True when the app is really playing, preferring its own answer over the
+    /// hardware's, which stays "running" for a while after a pause.
+    var reallyPlaying: Bool { transportPlaying ?? isPlaying }
+
     /// What clicking the row will do, so the chip never lies.
     var actionLabel: String {
         guard transport != nil else { return "focus" }
-        return isPlaying ? "pause" : "play"
+        return reallyPlaying ? "pause" : "play"
     }
 
     static func == (a: AudioSource, b: AudioSource) -> Bool {
         a.id == b.id && a.isPlaying == b.isPlaying && a.isRecording == b.isRecording
-            && a.name == b.name && abs(a.level - b.level) < 0.02
+            && a.name == b.name && a.transportPlaying == b.transportPlaying
+            && abs(a.level - b.level) < 0.02
     }
 }
 
