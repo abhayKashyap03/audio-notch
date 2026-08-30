@@ -28,6 +28,8 @@ struct Layout: Equatable {
     /// Height the panel's content actually laid out to. Row-count arithmetic is only
     /// ever an estimate, so the real measurement wins once SwiftUI reports it.
     var measuredBody: CGFloat?
+    /// The volume string the trailing side draws, measured rather than assumed.
+    var trailLabel: String = "100%"
 
     /// Width of a string in the rounded system font, matching what SwiftUI renders.
     private static func width(_ text: String, _ size: CGFloat, _ weight: NSFont.Weight) -> CGFloat {
@@ -47,8 +49,10 @@ struct Layout: Equatable {
     }
 
     /// A dot plus a percentage per provider, then the tone bar.
-    /// Volume readout plus the output-device glyph.
-    private var trailContent: CGFloat { 68 }
+    /// Speaker glyph plus the volume readout.
+    private var trailContent: CGFloat {
+        14 + 6 + max(Self.width(trailLabel, 11, .semibold), 26) + 8
+    }
 
     /// Wings are kept equal so the gap stays centred on the hardware notch.
     var islandWing: CGFloat {

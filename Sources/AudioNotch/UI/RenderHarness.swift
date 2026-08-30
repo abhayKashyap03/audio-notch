@@ -32,7 +32,8 @@ enum RenderHarness {
                                 active: snap.anyPlaying,
                                 leadName: snap.playing.first?.name ?? "",
                                 leadSubtitle: snap.currentDevice?.name ?? "",
-                                measuredBody: state.panelBodyHeight)
+                                measuredBody: state.panelBodyHeight,
+                                trailLabel: "\(Int((snap.volume * 100).rounded()))%")
             let size = layout.size(for: mode)
             snapshot(root, size: size, to: outputDirectory + "/\(name).png")
             print("rendered \(name).png  \(Int(size.width))x\(Int(size.height))")

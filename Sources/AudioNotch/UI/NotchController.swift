@@ -210,7 +210,8 @@ final class NotchController: NSObject, NSMenuDelegate {
                       active: snap.anyPlaying,
                       leadName: snap.playing.first?.name ?? snap.sources.first?.name ?? "",
                       leadSubtitle: snap.currentDevice?.name ?? "",
-                      measuredBody: state.panelBodyHeight)
+                      measuredBody: state.panelBodyHeight,
+                      trailLabel: "\(Int((snap.volume * 100).rounded()))%")
     }
 
     private func currentPlacement() -> Placement {

@@ -17,7 +17,8 @@ struct AudioRootView: View {
                active: snapshot.anyPlaying,
                leadName: snapshot.playing.first?.name ?? snapshot.sources.first?.name ?? "",
                leadSubtitle: subtitle,
-               measuredBody: state.panelBodyHeight)
+               measuredBody: state.panelBodyHeight,
+               trailLabel: "\(Int((snapshot.volume * 100).rounded()))%")
     }
 
     private var subtitle: String {
@@ -219,6 +220,7 @@ private struct PillContent: View {
             }
             trailing
         }
+        .fixedSize()
         .padding(.horizontal, Style.pillInset)
         .frame(width: size.width, height: size.height)
     }
