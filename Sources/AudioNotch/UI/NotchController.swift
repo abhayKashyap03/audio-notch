@@ -195,9 +195,10 @@ final class NotchController: NSObject, NSMenuDelegate {
         AudioRootView(
             store: store,
             state: state,
-            onHitTargets: { [weak self] targets in
-                self?.hosting?.hitTargets = targets
-                self?.debugLog("targets=\(targets.map { "\($0.id)@\(Int($0.rect.minY))-\(Int($0.rect.maxY))" }.sorted())")
+            onHitTargets: { [weak self] targets in self?.hosting?.hitTargets = targets },
+            onPanelHeight: { [weak self] height in
+                self?.debugLog("panel measured \(height)")
+                self?.positionPanel()
             }
         )
     }
@@ -208,7 +209,8 @@ final class NotchController: NSObject, NSMenuDelegate {
                       rows: snap.sources.count + snap.devices.count,
                       active: snap.anyPlaying,
                       leadName: snap.playing.first?.name ?? snap.sources.first?.name ?? "",
-                      leadSubtitle: snap.currentDevice?.name ?? "")
+                      leadSubtitle: snap.currentDevice?.name ?? "",
+                      measuredBody: state.panelBodyHeight)
     }
 
     private func currentPlacement() -> Placement {

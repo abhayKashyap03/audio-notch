@@ -24,13 +24,15 @@ enum RenderHarness {
         for (mode, name) in [(NotchMode.mini, "mini"), (.pill, "pill"), (.expanded, "expanded")] {
             state.mode = mode
             state.placement = Placement(edge: edge, anchor: .rightOfNotch, notch: notch)
-            let root = AudioRootView(store: store, state: state, onHitTargets: { _ in })
+            let root = AudioRootView(store: store, state: state,
+                                     onHitTargets: { _ in }, onPanelHeight: { _ in })
             let snap = store.snapshot
             let layout = Layout(placement: state.placement,
                                 rows: snap.sources.count + snap.devices.count,
                                 active: snap.anyPlaying,
                                 leadName: snap.playing.first?.name ?? "",
-                                leadSubtitle: snap.currentDevice?.name ?? "")
+                                leadSubtitle: snap.currentDevice?.name ?? "",
+                                measuredBody: state.panelBodyHeight)
             let size = layout.size(for: mode)
             snapshot(root, size: size, to: outputDirectory + "/\(name).png")
             print("rendered \(name).png  \(Int(size.width))x\(Int(size.height))")
@@ -60,6 +62,14 @@ enum RenderHarness {
         hosting.layoutSubtreeIfNeeded()
         spin(until: Date().addingTimeInterval(0.4)) { false }
 
+        // The panel sizes itself now, so trust its fitting size over the estimate.
+        let fitting = hosting.fittingSize
+        if fitting.height > hosting.frame.height + 0.5 {
+            hosting.frame = CGRect(origin: .zero, size: CGSize(width: hosting.frame.width, height: ceil(fitting.height)))
+            window.setContentSize(hosting.frame.size)
+            hosting.layoutSubtreeIfNeeded()
+            spin(until: Date().addingTimeInterval(0.25)) { false }
+        }
         guard let rep = hosting.bitmapImageRepForCachingDisplay(in: hosting.bounds) else { return }
         hosting.cacheDisplay(in: hosting.bounds, to: rep)
         if let data = rep.representation(using: .png, properties: [:]) {

@@ -5,6 +5,7 @@ struct AudioRootView: View {
     @ObservedObject var store: AudioStore
     @ObservedObject var state: NotchState
     var onHitTargets: ([HitTarget]) -> Void
+    var onPanelHeight: (CGFloat) -> Void
 
     private var placement: Placement { state.placement }
     private var alignment: Alignment { placement.alignment }
@@ -15,7 +16,8 @@ struct AudioRootView: View {
                rows: snapshot.sources.count + snapshot.devices.count,
                active: snapshot.anyPlaying,
                leadName: snapshot.playing.first?.name ?? snapshot.sources.first?.name ?? "",
-               leadSubtitle: subtitle)
+               leadSubtitle: subtitle,
+               measuredBody: state.panelBodyHeight)
     }
 
     private var subtitle: String {
@@ -39,7 +41,8 @@ struct AudioRootView: View {
         ZStack(alignment: alignment) {
             layer(MiniNub(layout: layout, active: snapshot.anyPlaying), visible: state.mode == .mini)
             layer(PillContent(snapshot: snapshot, layout: layout), visible: state.mode == .pill)
-            layer(Panel(store: store, layout: layout, onHitTargets: onHitTargets),
+            layer(Panel(store: store, layout: layout, onHitTargets: onHitTargets,
+                        onHeight: reportHeight),
                   visible: state.mode == .expanded)
         }
         .frame(width: currentSize.width, height: currentSize.height, alignment: alignment)
@@ -54,6 +57,14 @@ struct AudioRootView: View {
         .animation(Anim.morph, value: currentSize)
         .animation(Anim.morph, value: radius)
         .animation(Anim.morph, value: placement)
+    }
+
+    /// The panel measures itself; the shell, the window and the hit region follow it.
+    private func reportHeight(_ height: CGFloat) {
+        let rounded = ceil(height)
+        guard abs((state.panelBodyHeight ?? 0) - rounded) > 0.5 else { return }
+        state.panelBodyHeight = rounded
+        onPanelHeight(rounded)
     }
 
     private func layer<V: View>(_ view: V, visible: Bool) -> some View {
@@ -236,6 +247,7 @@ private struct Panel: View {
     @ObservedObject var store: AudioStore
     var layout: Layout
     var onHitTargets: ([HitTarget]) -> Void
+    var onHeight: (CGFloat) -> Void
 
     @State private var targets: [String: CGRect] = [:]
 
@@ -247,9 +259,13 @@ private struct Panel: View {
             if layout.placement.edge.isIsland {
                 band.frame(height: layout.placement.notch.height)
             }
+            // No fixed height: the content lays out naturally and reports what it
+            // needed, which is what everything else is then sized from.
             content
+                .fixedSize(horizontal: false, vertical: true)
+                .background(RectReader { onHeight($0.height) })
         }
-        .frame(width: size.width, height: size.height, alignment: .top)
+        .frame(width: size.width, alignment: .top)
         .onChange(of: targets) { _, new in
             onHitTargets(new.map { HitTarget(id: $0.key, rect: $0.value) })
         }
@@ -311,7 +327,6 @@ private struct Panel: View {
                 }
             }
 
-            Spacer(minLength: 0)
         }
         .padding(.horizontal, Style.panelInset)
         .padding(.top, layout.placement.edge.isIsland ? 8 : 12)
