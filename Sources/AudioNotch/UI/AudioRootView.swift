@@ -463,7 +463,7 @@ private struct Panel: View {
             LevelBars(tint: source.isRecording ? .red.opacity(0.8) : .green.opacity(0.85),
                       animating: source.isPlaying || source.isRecording,
                       level: source.level, height: 11)
-            Text(source.transport == nil ? "focus" : "pause")
+            Text(source.actionLabel)
                 .font(.system(size: 9, weight: .semibold, design: .rounded))
                 .foregroundStyle(.white.opacity(0.45))
                 .padding(.horizontal, 7).padding(.vertical, 3)

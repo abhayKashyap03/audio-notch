@@ -25,6 +25,12 @@ struct AudioSource: Identifiable, Equatable {
     /// Apps we can actually drive, rather than only focus.
     var transport: Transport? { Transport.forBundle(ownerBundleID ?? bundleID ?? "") }
 
+    /// What clicking the row will do, so the chip never lies.
+    var actionLabel: String {
+        guard transport != nil else { return "focus" }
+        return isPlaying ? "pause" : "play"
+    }
+
     static func == (a: AudioSource, b: AudioSource) -> Bool {
         a.id == b.id && a.isPlaying == b.isPlaying && a.isRecording == b.isRecording
             && a.name == b.name && abs(a.level - b.level) < 0.02

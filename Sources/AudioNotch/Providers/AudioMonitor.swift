@@ -105,6 +105,17 @@ final class AudioMonitor: @unchecked Sendable {
             }
         }
 
+        // Anything we can actually drive stays on the list even when silent —
+        // disappearing on pause defeats the point of having transport controls.
+        for app in NSWorkspace.shared.runningApplications {
+            guard let bundle = app.bundleIdentifier, Transport.forBundle(bundle) != nil,
+                  byOwner[bundle] == nil, app.activationPolicy == .regular else { continue }
+            byOwner[bundle] = AudioSource(id: app.processIdentifier,
+                                          name: app.localizedName ?? bundle,
+                                          bundleID: bundle, ownerBundleID: bundle,
+                                          isPlaying: false, isRecording: false)
+        }
+
         tapEngine.track(processes: metered)
         let levels = tapEngine.levels()
         let all = (Array(byOwner.values) + loose).map { source -> AudioSource in
@@ -115,6 +126,8 @@ final class AudioMonitor: @unchecked Sendable {
         return all.sorted { lhs, rhs in
             if lhs.isPlaying != rhs.isPlaying { return lhs.isPlaying }
             if lhs.isRecording != rhs.isRecording { return lhs.isRecording }
+            // Controllable apps outrank passive ones when both are quiet.
+            if (lhs.transport != nil) != (rhs.transport != nil) { return lhs.transport != nil }
             return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
         }
     }
