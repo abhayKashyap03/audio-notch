@@ -47,6 +47,9 @@ final class AudioStore: ObservableObject {
         if updated != snapshot { snapshot = updated }
     }
 
+    /// Album art for a track, once it has been fetched.
+    func artwork(for url: String?) -> NSImage? { monitor.artwork(for: url) }
+
     func reload() {
         let fresh = monitor.snapshot()
         guard fresh != snapshot else { return }
@@ -58,7 +61,9 @@ final class AudioStore: ObservableObject {
         snapshot = AudioSnapshot(
             sources: [
                 AudioSource(id: 501, name: "Spotify", bundleID: "com.spotify.client",
-                            ownerBundleID: "com.spotify.client", isPlaying: true, isRecording: false),
+                            ownerBundleID: "com.spotify.client", isPlaying: true, isRecording: false,
+                            transportPlaying: true,
+                            track: TrackInfo(title: "we never dated", artist: "sombr", artworkURL: nil)),
                 AudioSource(id: 502, name: "Arc", bundleID: "company.thebrowser.Browser",
                             ownerBundleID: "company.thebrowser.Browser", isPlaying: true, isRecording: false),
                 AudioSource(id: 503, name: "Zoom", bundleID: "us.zoom.xos",

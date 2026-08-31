@@ -12,6 +12,7 @@ import AppKit
 final class TransportProbe: @unchecked Sendable {
     private let lock = NSLock()
     private var states: [Transport: Bool] = [:]
+    private var tracks: [Transport: TrackInfo] = [:]
     private var lastPoll = Date.distantPast
     private let queue = DispatchQueue(label: "com.abhaykashyap.audionotch.transport", qos: .utility)
     private var polling = false
@@ -22,6 +23,12 @@ final class TransportProbe: @unchecked Sendable {
     func isPlaying(_ transport: Transport) -> Bool? {
         lock.lock(); defer { lock.unlock() }
         return states[transport]
+    }
+
+    /// What the app is playing, when it tells us.
+    func track(_ transport: Transport) -> TrackInfo? {
+        lock.lock(); defer { lock.unlock() }
+        return tracks[transport]
     }
 
     /// Records a state we were told about, rather than one we asked for.
@@ -45,11 +52,15 @@ final class TransportProbe: @unchecked Sendable {
         queue.async { [weak self] in
             guard let self else { return }
             var fresh: [Transport: Bool] = [:]
+            var freshTracks: [Transport: TrackInfo] = [:]
             for transport in running {
-                if let playing = AudioControls.isPlaying(transport) { fresh[transport] = playing }
+                guard let answer = AudioControls.nowPlaying(transport) else { continue }
+                fresh[transport] = answer.playing
+                if let track = answer.track { freshTracks[transport] = track }
             }
             self.lock.lock()
             self.states = fresh
+            self.tracks = freshTracks
             self.lastPoll = Date()
             self.polling = false
             self.lock.unlock()

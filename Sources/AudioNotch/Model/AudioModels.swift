@@ -16,6 +16,8 @@ struct AudioSource: Identifiable, Equatable {
     var level: Float = 0
     /// What a scriptable app says about itself, which beats the hardware's view.
     var transportPlaying: Bool?
+    /// The track a media app is playing, when it will say.
+    var track: TrackInfo?
 
     var icon: NSImage? {
         guard let bundle = ownerBundleID ?? bundleID,
@@ -40,7 +42,7 @@ struct AudioSource: Identifiable, Equatable {
     static func == (a: AudioSource, b: AudioSource) -> Bool {
         a.id == b.id && a.isPlaying == b.isPlaying && a.isRecording == b.isRecording
             && a.name == b.name && a.transportPlaying == b.transportPlaying
-            && abs(a.level - b.level) < 0.02
+            && a.track == b.track && abs(a.level - b.level) < 0.02
     }
 }
 

@@ -15,16 +15,26 @@ struct AudioRootView: View {
         Layout(placement: placement,
                rows: snapshot.sources.count + snapshot.devices.count,
                active: snapshot.anyPlaying,
-               leadName: snapshot.playing.first?.name ?? snapshot.sources.first?.name ?? "",
-               leadSubtitle: subtitle,
+               leadName: leadTitle,
+               leadSubtitle: leadSubtitle,
                measuredBody: state.panelBodyHeight,
                trailLabel: "\(Int((snapshot.volume * 100).rounded()))%")
     }
 
-    private var subtitle: String {
+    private var lead: AudioSource? { snapshot.playing.first ?? snapshot.sources.first }
+
+    /// A playing media app shows what it is playing; everything else shows its name.
+    private var leadTitle: String {
+        guard let lead else { return "" }
+        if let track = lead.track, lead.reallyPlaying { return String(track.title.prefix(24)) }
+        return lead.name
+    }
+
+    private var leadSubtitle: String {
+        guard let lead else { return "no output" }
+        if let track = lead.track, lead.reallyPlaying { return String(track.artist.prefix(24)) }
         if snapshot.playing.count > 1 { return "+\(snapshot.playing.count - 1) more" }
-        if let device = snapshot.currentDevice { return device.name }
-        return "no output"
+        return lead.reallyPlaying ? "playing" : "paused"
     }
 
     private var currentSize: CGSize { layout.size(for: state.mode) }
@@ -41,7 +51,9 @@ struct AudioRootView: View {
     private var shell: some View {
         ZStack(alignment: alignment) {
             layer(MiniNub(layout: layout, active: snapshot.anyPlaying), visible: state.mode == .mini)
-            layer(PillContent(snapshot: snapshot, layout: layout), visible: state.mode == .pill)
+            layer(PillContent(snapshot: snapshot, layout: layout,
+                               artworkFor: { [store] in store.artwork(for: $0) }),
+                  visible: state.mode == .pill)
             layer(Panel(store: store, layout: layout, onHitTargets: onHitTargets,
                         onHeight: reportHeight),
                   visible: state.mode == .expanded)
@@ -125,10 +137,17 @@ struct LevelBars: View {
 private struct AppIcon: View {
     var source: AudioSource
     var size: CGFloat = 16
+    /// Album art when the app is playing something and has handed it over.
+    var artwork: NSImage?
 
     var body: some View {
         Group {
-            if let icon = source.icon {
+            if let artwork {
+                Image(nsImage: artwork)
+                    .resizable()
+                    .interpolation(.high)
+                    .clipShape(RoundedRectangle(cornerRadius: size * 0.22, style: .continuous))
+            } else if let icon = source.icon {
                 Image(nsImage: icon).resizable().interpolation(.high)
             } else {
                 Image(systemName: "app.dashed").resizable()
@@ -166,8 +185,10 @@ private struct MiniNub: View {
 private struct PillContent: View {
     var snapshot: AudioSnapshot
     var layout: Layout
+    var artworkFor: (String?) -> NSImage?
 
     private var lead: AudioSource? { snapshot.playing.first ?? snapshot.sources.first }
+    private var leadTrack: TrackInfo? { (lead?.reallyPlaying ?? false) ? lead?.track : nil }
 
     var body: some View {
         let size = layout.size(for: .pill)
@@ -183,13 +204,13 @@ private struct PillContent: View {
     private var leading: some View {
         HStack(spacing: 6) {
             if let lead {
-                AppIcon(source: lead)
+                AppIcon(source: lead, artwork: artworkFor(leadTrack?.artworkURL))
                 VStack(alignment: .leading, spacing: 0) {
-                    Text(lead.name)
+                    Text(leadTrack.map { String($0.title.prefix(24)) } ?? lead.name)
                         .font(.system(size: 9.5, weight: .semibold, design: .rounded))
                         .foregroundStyle(.white.opacity(0.9))
                         .lineLimit(1)
-                    Text(snapshot.playing.count > 1 ? "+\(snapshot.playing.count - 1) more" : (lead.reallyPlaying ? "playing" : "paused"))
+                    Text(subtitleText(for: lead))
                         .font(.system(size: 8.5, weight: .medium, design: .rounded))
                         .foregroundStyle(.white.opacity(0.45))
                         .lineLimit(1)
@@ -205,6 +226,12 @@ private struct PillContent: View {
                     .foregroundStyle(.white.opacity(0.35))
             }
         }
+    }
+
+    private func subtitleText(for lead: AudioSource) -> String {
+        if let track = leadTrack, !track.artist.isEmpty { return String(track.artist.prefix(24)) }
+        if snapshot.playing.count > 1 { return "+\(snapshot.playing.count - 1) more" }
+        return lead.reallyPlaying ? "playing" : "paused"
     }
 
     private var trailing: some View {
@@ -475,8 +502,9 @@ private struct Panel: View {
     }
 
     private func sourceRow(_ source: AudioSource) -> some View {
-        HStack(spacing: 9) {
-            AppIcon(source: source, size: 17)
+        let track = source.reallyPlaying ? source.track : nil
+        return HStack(spacing: 9) {
+            AppIcon(source: source, size: 17, artwork: store.artwork(for: track?.artworkURL))
             VStack(alignment: .leading, spacing: 1) {
                 Text(source.name)
                     .font(.system(size: 11, weight: .semibold, design: .rounded))
@@ -486,6 +514,23 @@ private struct Panel: View {
                     .font(.system(size: 9, weight: .medium, design: .rounded))
                     .foregroundStyle(source.isRecording ? .red.opacity(0.8) : .white.opacity(0.35))
             }
+            if let track {
+                Spacer(minLength: 8)
+                VStack(alignment: .trailing, spacing: 0) {
+                    Text(track.title)
+                        .font(.system(size: 10, weight: .medium, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.75))
+                    if !track.artist.isEmpty {
+                        Text(track.artist)
+                            .font(.system(size: 8.5, weight: .medium, design: .rounded))
+                            .foregroundStyle(.white.opacity(0.4))
+                    }
+                }
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .layoutPriority(-1)
+            }
+
             Spacer(minLength: 4)
             LevelBars(tint: source.isRecording ? .red.opacity(0.8) : .green.opacity(0.85),
                       animating: source.isPlaying || source.isRecording,

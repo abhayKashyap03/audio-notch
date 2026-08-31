@@ -22,9 +22,13 @@ final class AudioMonitor: @unchecked Sendable {
     private let queue = DispatchQueue(label: "com.abhaykashyap.audionotch.coreaudio")
     private let tapEngine = AudioTapEngine()
     private let transportProbe = TransportProbe()
+    private let nowPlaying = NowPlaying()
 
     /// Drops the cached playback answer so the next snapshot re-asks immediately.
     func invalidateTransport() { transportProbe.invalidate() }
+
+    /// Album art for a track, downloaded once per URL.
+    func artwork(for url: String?) -> NSImage? { nowPlaying.image(for: url) }
 
     /// Live 0...1 levels per app, empty when tapping is unavailable.
     func levels() -> [pid_t: Float] { tapEngine.levels() }
@@ -130,7 +134,10 @@ final class AudioMonitor: @unchecked Sendable {
         let all = (Array(byOwner.values) + loose).map { source -> AudioSource in
             var copy = source
             copy.level = levels[source.id] ?? 0
-            if let transport = source.transport { copy.transportPlaying = transportProbe.isPlaying(transport) }
+            if let transport = source.transport {
+                copy.transportPlaying = transportProbe.isPlaying(transport)
+                copy.track = transportProbe.track(transport)
+            }
             return copy
         }
         return all.sorted { lhs, rhs in

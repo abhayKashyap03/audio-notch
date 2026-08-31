@@ -47,7 +47,8 @@ struct Layout: Equatable {
     /// spacing, which measurement of the strings alone does not account for.
     private var leadContent: CGFloat {
         let text = max(Self.width(leadName, 9.5, .semibold), Self.width(leadSubtitle, 8.5, .medium))
-        return 16 + 6 + max(text, 40) + 6
+        // Bars sit after the text when a track is playing, so leave room for them.
+        return 16 + 6 + max(text, 40) + 12 + 6
     }
 
     /// A dot plus a percentage per provider, then the tone bar.

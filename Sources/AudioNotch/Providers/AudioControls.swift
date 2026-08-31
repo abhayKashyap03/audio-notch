@@ -83,6 +83,29 @@ enum AudioControls {
         return value.contains("playing")
     }
 
+    /// Playback state and the current track in a single Apple event, since asking
+    /// twice doubles the cost of something polled every second.
+    static func nowPlaying(_ transport: Transport) -> (playing: Bool, track: TrackInfo?)? {
+        let script = """
+        tell application "\(transport.appName)"
+            set s to player state as string
+            if s is "playing" or s is "paused" then
+                set t to current track
+                return s & "\t" & (name of t) & "\t" & (artist of t) & "\t" & (artwork url of t)
+            end if
+            return s
+        end tell
+        """
+        let result = execute(script)
+        guard result.ok, let value = result.value else { return nil }
+        let parts = value.components(separatedBy: "\t")
+        let playing = parts.first?.contains("playing") ?? false
+        guard parts.count >= 3 else { return (playing, nil) }
+        let track = TrackInfo(title: parts[1], artist: parts[2],
+                              artworkURL: parts.count > 3 ? parts[3] : nil)
+        return (playing, track.title.isEmpty ? nil : track)
+    }
+
     /// Everything else gets brought to the front so you can deal with it yourself.
     static func focus(pid: pid_t) {
         NSRunningApplication(processIdentifier: pid)?.activate(options: [.activateAllWindows])
