@@ -246,8 +246,15 @@ private struct PillContent: View {
         VStack(spacing: 7) {
             if let lead {
                 AppIcon(source: lead, size: 14)
-                LevelBars(tint: .green.opacity(0.85), animating: lead.isPlaying,
-                          level: lead.level, height: 9)
+                if lead.reallyPlaying {
+                    LevelBars(tint: .green.opacity(0.85), animating: true,
+                              level: lead.level, height: 9)
+                } else {
+                    // Four flat bars read as broken; a pause glyph reads as paused.
+                    Image(systemName: "pause.fill")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(.white.opacity(0.4))
+                }
             } else {
                 Image(systemName: "speaker.slash.fill")
                     .font(.system(size: 10))
@@ -312,8 +319,8 @@ private struct Panel: View {
 
     private var content: some View {
         VStack(alignment: .leading, spacing: 10) {
-            if !layout.placement.edge.isIsland {
-                HStack {
+            HStack(spacing: 6) {
+                if !layout.placement.edge.isIsland {
                     Text("AUDIO")
                         .font(.system(size: 9.5, weight: .bold, design: .rounded))
                         .tracking(1.1)
@@ -323,7 +330,18 @@ private struct Panel: View {
                         .font(.system(size: 9.5, weight: .medium, design: .rounded))
                         .foregroundStyle(.white.opacity(0.4))
                         .lineLimit(1)
+                } else {
+                    Spacer()
                 }
+                // macOS hides menu-bar icons first when the bar is full, which on a
+                // notched Mac is routine, so settings are reachable from here too.
+                Image(systemName: "gearshape.fill")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.45))
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 3)
+                    .background(Color.white.opacity(0.07), in: Capsule())
+                    .measured("settings", into: $targets)
             }
 
             volumeRow

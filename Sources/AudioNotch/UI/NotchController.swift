@@ -431,6 +431,9 @@ final class NotchController: NSObject, NSMenuDelegate {
         case id == "volume":
             let width = hosting.hitTargets.first { $0.id == "volume" }?.rect.width ?? 1
             store.setVolume(Float(min(max(point.x / width, 0), 1)))
+        case id == "settings":
+            let rect = contentScreenRect()
+            showContextMenu(at: NSPoint(x: rect.midX, y: rect.minY))
         case id.hasPrefix("source:"):
             let pid = pid_t(id.dropFirst("source:".count)) ?? -1
             if let source = snapshot.sources.first(where: { $0.id == pid }) { store.act(on: source) }
