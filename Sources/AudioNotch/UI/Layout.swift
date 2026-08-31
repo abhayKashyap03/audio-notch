@@ -12,7 +12,7 @@ enum Style {
     /// Inset for the opened panel.
     static let panelInset: CGFloat = 16
     /// Top and bottom room inside the vertical side pill.
-    static let sidePillInset: CGFloat = 13
+    static let sidePillInset: CGFloat = 16.5
 }
 
 /// Every size decision in one place, so the AppKit hit region and the SwiftUI frame
