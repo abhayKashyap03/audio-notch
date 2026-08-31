@@ -6,7 +6,7 @@ import AppKit
 enum Style {
     /// Breathing room between an island wing's content and the outer corner. The
     /// corner radius eats into this visually, so it is larger than it looks.
-    static let wingInset: CGFloat = 20
+    static let wingInset: CGFloat = 11
     /// Inset for the single-run pill layouts.
     static let pillInset: CGFloat = 16
     /// Inset for the opened panel.
@@ -47,13 +47,13 @@ struct Layout: Equatable {
     /// spacing, which measurement of the strings alone does not account for.
     private var leadContent: CGFloat {
         let text = max(Self.width(leadName, 9.5, .semibold), Self.width(leadSubtitle, 8.5, .medium))
-        return 16 + 6 + max(text, 40) + 12
+        return 16 + 6 + max(text, 40) + 6
     }
 
     /// A dot plus a percentage per provider, then the tone bar.
     /// Speaker glyph plus the volume readout.
     private var trailContent: CGFloat {
-        14 + 6 + max(Self.width(trailLabel, 11, .semibold), 26) + 8
+        14 + 6 + max(Self.width(trailLabel, 11, .semibold), 26)
     }
 
     /// Wings are kept equal so the gap stays centred on the hardware notch.

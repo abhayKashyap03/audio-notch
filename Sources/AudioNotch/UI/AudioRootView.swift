@@ -305,22 +305,25 @@ private struct Panel: View {
                 .font(.system(size: 9, weight: .bold, design: .rounded))
                 .tracking(1.1)
                 .foregroundStyle(.white.opacity(0.5))
-                .fixedSize()
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.leading, Style.panelInset)
                 .frame(width: wing)
             Color.clear.frame(width: layout.notchGap)
             Text(snapshot.currentDevice?.name ?? "—")
                 .font(.system(size: 9.5, weight: .medium, design: .rounded))
                 .foregroundStyle(.white.opacity(0.45))
                 .lineLimit(1)
-                .fixedSize()
+                .truncationMode(.tail)
+                .frame(maxWidth: .infinity, alignment: .trailing)
+                .padding(.trailing, Style.panelInset)
                 .frame(width: wing)
         }
     }
 
     private var content: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 6) {
-                if !layout.placement.edge.isIsland {
+            if !layout.placement.edge.isIsland {
+                HStack(spacing: 6) {
                     Text("AUDIO")
                         .font(.system(size: 9.5, weight: .bold, design: .rounded))
                         .tracking(1.1)
@@ -330,18 +333,7 @@ private struct Panel: View {
                         .font(.system(size: 9.5, weight: .medium, design: .rounded))
                         .foregroundStyle(.white.opacity(0.4))
                         .lineLimit(1)
-                } else {
-                    Spacer()
                 }
-                // macOS hides menu-bar icons first when the bar is full, which on a
-                // notched Mac is routine, so settings are reachable from here too.
-                Image(systemName: "gearshape.fill")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.45))
-                    .padding(.horizontal, 5)
-                    .padding(.vertical, 3)
-                    .background(Color.white.opacity(0.07), in: Capsule())
-                    .measured("settings", into: $targets)
             }
 
             volumeRow
@@ -438,11 +430,11 @@ private struct Panel: View {
     }
 
     private var volumeRow: some View {
-        HStack(spacing: 9) {
+        HStack(alignment: .center, spacing: 9) {
             Image(systemName: snapshot.muted ? "speaker.slash.fill" : "speaker.wave.2.fill")
                 .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(.white.opacity(snapshot.muted ? 0.4 : 0.75))
-                .frame(width: 16)
+                .frame(width: 18, height: 20)
                 .measured("mute", into: $targets)
 
             // The bar is 5pt tall for looks, but the target it reports is the full
@@ -467,7 +459,17 @@ private struct Panel: View {
             Text("\(Int((snapshot.volume * 100).rounded()))")
                 .font(.system(size: 10, weight: .semibold, design: .monospaced))
                 .foregroundStyle(.white.opacity(0.6))
-                .frame(width: 24, alignment: .trailing)
+                .frame(width: 24, height: 20, alignment: .trailing)
+
+            // Settings live on this row rather than a line of their own: macOS hides
+            // menu-bar icons when the bar is full, so this cannot be the only route,
+            // but it should not cost a whole row either.
+            Image(systemName: "gearshape.fill")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.45))
+                .frame(width: 22, height: 20)
+                .background(Color.white.opacity(0.07), in: Capsule())
+                .measured("settings", into: $targets)
         }
         .frame(height: 20)
     }
