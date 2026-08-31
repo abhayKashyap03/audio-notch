@@ -445,16 +445,23 @@ private struct Panel: View {
                 .frame(width: 16)
                 .measured("mute", into: $targets)
 
-            GeometryReader { proxy in
-                ZStack(alignment: .leading) {
-                    Capsule().fill(Color.white.opacity(0.12))
-                    Capsule()
-                        .fill(snapshot.muted ? Color.white.opacity(0.25) : Color.green.opacity(0.85))
-                        .frame(width: proxy.size.width * CGFloat(snapshot.muted ? 0 : snapshot.volume))
-                        .animation(.easeOut(duration: 0.15), value: snapshot.volume)
+            // The bar is 5pt tall for looks, but the target it reports is the full
+            // row height — a five point strip is missed as often as it is hit.
+            ZStack {
+                Color.white.opacity(0.001)          // catches clicks either side of the bar
+                GeometryReader { proxy in
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(Color.white.opacity(0.12))
+                        Capsule()
+                            .fill(snapshot.muted ? Color.white.opacity(0.25) : Color.green.opacity(0.85))
+                            .frame(width: proxy.size.width * CGFloat(snapshot.muted ? 0 : snapshot.volume))
+                            .animation(.easeOut(duration: 0.12), value: snapshot.volume)
+                    }
+                    .frame(height: 5)
+                    .frame(maxHeight: .infinity, alignment: .center)
                 }
             }
-            .frame(height: 5)
+            .frame(height: 18)
             .measured("volume", into: $targets)
 
             Text("\(Int((snapshot.volume * 100).rounded()))")

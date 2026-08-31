@@ -21,6 +21,7 @@ final class NotchHostingView: NSHostingView<AudioRootView> {
     var onPrimaryClick: (() -> Void)?
     var onTargetClick: ((String, CGPoint) -> Void)?
     var onSecondaryClick: ((NSPoint) -> Void)?
+    var onTargetDrag: ((String, CGPoint) -> Void)?
     var onDragBegan: (() -> Void)?
     var onDragMoved: ((NSPoint, CGPoint) -> Void)?
     var onDragEnded: (() -> Void)?
@@ -29,13 +30,25 @@ final class NotchHostingView: NSHostingView<AudioRootView> {
 
     private var pressOrigin: NSPoint?
     private var isDragging = false
+    /// The control the press started on, if any. Dragging inside a slider should
+    /// move the slider, not the whole pill.
+    private var pressedTarget: HitTarget?
 
     override func mouseDown(with event: NSEvent) {
         pressOrigin = NSEvent.mouseLocation
         isDragging = false
+        let point = contentPoint(inWindow: event.locationInWindow)
+        pressedTarget = targetsEnabled ? hitTargets.first { $0.rect.contains(point) } : nil
     }
 
     override func mouseDragged(with event: NSEvent) {
+        // A drag that began on the volume bar adjusts it, continuously.
+        if let target = pressedTarget, target.id == "volume" {
+            let point = contentPoint(inWindow: event.locationInWindow)
+            isDraggingSlider = true
+            onTargetDrag?(target.id, CGPoint(x: point.x - target.rect.minX, y: point.y - target.rect.minY))
+            return
+        }
         guard let start = pressOrigin else { return }
         let current = NSEvent.mouseLocation
         let delta = CGPoint(x: current.x - start.x, y: current.y - start.y)
@@ -48,7 +61,12 @@ final class NotchHostingView: NSHostingView<AudioRootView> {
     }
 
     override func mouseUp(with event: NSEvent) {
-        defer { pressOrigin = nil; isDragging = false }
+        defer { pressOrigin = nil; isDragging = false; pressedTarget = nil }
+        // A slider drag has already applied itself; do not also treat it as a click.
+        if let target = pressedTarget, target.id == "volume", isDraggingSlider {
+            isDraggingSlider = false
+            return
+        }
         if isDragging {
             onDragEnded?()
             return
@@ -65,6 +83,8 @@ final class NotchHostingView: NSHostingView<AudioRootView> {
     override func rightMouseDown(with event: NSEvent) {
         onSecondaryClick?(NSEvent.mouseLocation)
     }
+
+    private var isDraggingSlider = false
 
     /// Panels that never activate still need to accept the very first click.
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
@@ -179,6 +199,7 @@ final class NotchController: NSObject, NSMenuDelegate {
         hosting.onDebug = { [weak self] message in self?.debugLog(message) }
         hosting.onPrimaryClick = { [weak self] in self?.refresh(spin: true) }
         hosting.onTargetClick = { [weak self] id, point in self?.handleTarget(id, at: point) }
+        hosting.onTargetDrag = { [weak self] id, point in self?.handleTarget(id, at: point) }
         hosting.onSecondaryClick = { [weak self] location in self?.showContextMenu(at: location) }
         hosting.onDragBegan = { [weak self] in self?.dragBegan() }
         hosting.onDragMoved = { [weak self] cursor, delta in self?.dragMoved(cursor: cursor, delta: delta) }
