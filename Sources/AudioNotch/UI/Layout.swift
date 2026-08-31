@@ -11,6 +11,8 @@ enum Style {
     static let pillInset: CGFloat = 16
     /// Inset for the opened panel.
     static let panelInset: CGFloat = 16
+    /// Top and bottom room inside the vertical side pill.
+    static let sidePillInset: CGFloat = 13
 }
 
 /// Every size decision in one place, so the AppKit hit region and the SwiftUI frame
@@ -92,7 +94,11 @@ struct Layout: Equatable {
         switch mode {
         case .mini: return CGSize(width: 9, height: 46)
         case .pill:
-            return CGSize(width: 38, height: active ? 74 : 48)
+            // Sized from the stack it holds — icon, indicator, volume — plus real
+            // breathing room top and bottom. The old fixed height left about 4pt,
+            // which reads as content jammed against the edges.
+            let content: CGFloat = active ? (16 + 8 + 12 + 8 + 13) : (14 + 8 + 13)
+            return CGSize(width: 42, height: content + Style.sidePillInset * 2)
         case .expanded: return CGSize(width: 320, height: panelBody)
         }
     }

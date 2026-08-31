@@ -243,9 +243,9 @@ private struct PillContent: View {
     }
 
     private func vertical(_ size: CGSize) -> some View {
-        VStack(spacing: 7) {
+        VStack(spacing: 8) {
             if let lead {
-                AppIcon(source: lead, size: 14)
+                AppIcon(source: lead, size: 16)
                 if lead.reallyPlaying {
                     LevelBars(tint: .green.opacity(0.85), animating: true,
                               level: lead.level, height: 9)
@@ -261,10 +261,10 @@ private struct PillContent: View {
                     .foregroundStyle(.white.opacity(0.3))
             }
             Text("\(Int((snapshot.volume * 100).rounded()))")
-                .font(.system(size: 10, weight: .semibold, design: .rounded))
+                .font(.system(size: 11, weight: .semibold, design: .rounded))
                 .foregroundStyle(.white.opacity(0.9))
         }
-        .padding(.vertical, 8)
+        .padding(.vertical, Style.sidePillInset)
         .frame(width: size.width, height: size.height)
     }
 }
